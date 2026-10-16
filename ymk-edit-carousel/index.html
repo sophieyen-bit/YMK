@@ -48,6 +48,11 @@ html, body { width:100%; height:100%; background:#000; overflow:hidden; touch-ac
 /* full-bleed top: desktop = Figma status bar over the banner; phone = banner top only, under the real status bar */
 .top-strip { height:var(--safe-top); background:url(media/top_desktop.png) center bottom / 100% 100% no-repeat; }
 @media (max-width:480px) { .top-strip { background-image:url(media/top_phone.png); } }
+/* Wrapper app (PF App Prototype b7) hides the iOS status bar -> draw the Figma one, TEMPORARY (time fixed at 10:32).
+   Remove once the wrapper shows the real status bar (prefersStatusBarHidden=false), or the two will stack. ?sb=0 / ?sb=1 overrides. */
+:root.fake-sb .top-strip { background:
+  url(media/top_desktop.png) center bottom / 320px 44px no-repeat,
+  url(media/top_phone.png) center bottom / 100% 100% no-repeat; }
 
 /* Main Action Bar — Figma 5273:364930 */
 .action-bar { position:relative; width:320px; height:62px; }
@@ -176,6 +181,7 @@ html, body { width:100%; height:100%; background:#000; overflow:hidden; touch-ac
     var frame = document.getElementById('frame');
     if (window.innerWidth > MOBILE_MAX) {
       frame.style.transform = ''; frame.style.removeProperty('height');
+      root.classList.remove('fake-sb');
       root.style.removeProperty('--mob-scale'); root.style.removeProperty('--safe-top'); root.style.removeProperty('--safe-bot');
       return;
     }
@@ -199,6 +205,8 @@ html, body { width:100%; height:100%; background:#000; overflow:hidden; touch-ac
     var liveEnv = !inj && !fb && mode === 'env';
     root.style.setProperty('--safe-top', liveEnv ? 'calc(env(safe-area-inset-top, 0px) / ' + scale + ')' : (topPad / scale) + 'px');
     root.style.setProperty('--safe-bot', (BOTTOM_BAR_INCLUDES_HOME_INDICATOR ? 0 : insetBot / scale) + 'px');
+    var sbq = (location.search.match(/[?&]sb=([01])/) || [])[1];
+    root.classList.toggle('fake-sb', sbq ? sbq === '1' : envType === 'webview');
     if (FRAME_HEIGHT === 'inner') frame.style.setProperty('height', (window.innerHeight / scale) + 'px', 'important');
     else frame.style.removeProperty('height');
 
@@ -209,7 +217,7 @@ html, body { width:100%; height:100%; background:#000; overflow:hidden; touch-ac
       b.textContent = 'inset ' + insetTop + '/' + insetBot + ' · screen ' + screen.width + 'x' + screen.height +
                       ' · inner ' + window.innerWidth + 'x' + window.innerHeight + ' · ' + envType +
                       ' · injected=' + (inj ? (inj.top + (inj.build ? ' b' + inj.build : '')) : 'no') +
-                      ' · top=' + q + (fb ? '(fallback)' : '') + '→' + topPad + '\n' + ua;
+                      ' · top=' + q + (fb ? '(fallback)' : '') + '→' + topPad + ' · fakeSB=' + root.classList.contains('fake-sb') + '\n' + ua;
     }
   }
   apply();
