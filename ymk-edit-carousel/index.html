@@ -51,18 +51,36 @@ html, body { width:100%; height:100%; background:#000; overflow:hidden; touch-ac
 
 /* Main Action Bar — Figma 5273:364930 */
 .action-bar { position:relative; width:320px; height:62px; }
-.rot-mask { position:absolute; left:68px; top:13px; width:80px; height:21px; background:var(--bg); }
-.rot {                                   /* text node 5273:364934 at (71.5, 15.5) in the bar */
-  position:absolute; left:3.5px; top:2.5px; width:72px; height:16px; overflow:hidden;
-}
-.rot-track { will-change:transform; }
-.rot-item {
-  display:block; height:16px; line-height:16px; white-space:nowrap;
-  font-family:"SF Pro Display", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  font-weight:500; font-size:13.5px; color:var(--text-main);
-}
+/* Version A — label only. Same 4x button art as B, so weight matches B and "Camera" exactly */
+.rotA { position:absolute; left:68px; top:6px; width:68px; height:35px; overflow:hidden; }
+.rotA-track { will-change:transform; }
+.rotA-slide { display:block; width:68px; height:35px;
+  background-repeat:no-repeat; background-size:320px 62px; background-position:-68px -6px; }
+.rotA-slide.photo { background-image:url(media/action_bar.png); }
+.rotA-slide.video { background-image:url(media/action_bar_video.png); }
+
+/* Version B — icon + label slide together; slices of the 4x button art (identical pixels to action_bar.png) */
+.rotB { position:absolute; left:38px; top:6px; width:98px; height:35px; overflow:hidden; display:none; }
+.rotB-track { will-change:transform; }
+.rotB-slide { display:block; width:98px; height:35px;
+  background-repeat:no-repeat; background-size:320px 62px; background-position:-38px -6px; }
+.rotB-slide.photo { background-image:url(media/action_bar.png); }
+.rotB-slide.video { background-image:url(media/action_bar_video.png); }
+.frame-b .rotA { display:none; }
+.frame-b .rotB { display:block; }
 
 .bottom-nav { position:absolute; left:0; bottom:var(--safe-bot); width:320px; height:130px; z-index:10; pointer-events:none; }
+
+/* A/B switch — floats above Hair Magic, right of the bottom nav */
+.ab-toggle { position:absolute; right:12px; bottom:calc(var(--safe-bot) + 77px); z-index:12;
+  width:62px; height:38px; padding:0; border:0; background:none; cursor:pointer;
+  transition:transform 150ms ease; }
+.ab-toggle:active { transform:scale(.94); }
+.ab-toggle:focus-visible { outline:2px solid #1d1db9; outline-offset:2px; border-radius:20px; }
+.ab-toggle img { display:block; width:62px; height:38px; }
+.ab-toggle img + img { display:none; }
+.frame-b .ab-toggle img { display:none; }
+.frame-b .ab-toggle img + img { display:block; }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
@@ -78,13 +96,18 @@ html, body { width:100%; height:100%; background:#000; overflow:hidden; touch-ac
       <img class="blk" src="media/hero.png" width="320" height="196" alt="YouCam Makeup — Perfect Your Smile">
       <div class="action-bar">
         <img class="blk" src="media/action_bar.png" width="320" height="62" alt="">
-        <div class="rot-mask">
-          <div class="rot" role="text" aria-label="Photo Edit">
-            <div class="rot-track" id="rot-track">
-              <span class="rot-item">Photo Edit</span>
-              <span class="rot-item">Video Edit</span>
-              <span class="rot-item" aria-hidden="true">Photo Edit</span>
-            </div>
+        <div class="rotA" role="text" aria-label="Photo Edit">
+          <div class="rotA-track" id="rotA-track">
+            <span class="rotA-slide photo"></span>
+            <span class="rotA-slide video"></span>
+            <span class="rotA-slide photo" aria-hidden="true"></span>
+          </div>
+        </div>
+        <div class="rotB" role="text" aria-label="Photo Edit">
+          <div class="rotB-track" id="rotB-track">
+            <span class="rotB-slide photo"></span>
+            <span class="rotB-slide video"></span>
+            <span class="rotB-slide photo" aria-hidden="true"></span>
           </div>
         </div>
       </div>
@@ -92,25 +115,46 @@ html, body { width:100%; height:100%; background:#000; overflow:hidden; touch-ac
       <img class="blk" src="media/content.png" width="320" height="173" alt="Hair Magic">
     </div>
     <img class="bottom-nav" src="media/bottom_nav.png" width="320" height="130" alt="">
+    <button type="button" class="ab-toggle" id="ab-toggle" aria-label="版本 A，點擊切換到版本 B">
+      <img src="media/AB_A.png" width="62" height="38" alt="">
+      <img src="media/AB_B.png" width="62" height="38" alt="">
+    </button>
   </div>
 </div>
 <script>
-/* Photo Edit ⇄ Video Edit — vertical carousel: hold 3s, slide up 300ms, loop */
+/* Photo Edit ⇄ Video Edit — vertical carousel: each label holds 2.2s, slides up 300ms, loops.
+   A = label only. B = icon + label (slices of the 4x button art). Switch: bottom-right A/B, or ?v=b */
 (function () {
-  var HOLD = 3000, STEP = 16, track = document.getElementById('rot-track');
-  var rot = track.parentNode, labels = ['Photo Edit', 'Video Edit'], i = 0;
-  function set(idx, animate) {
-    track.style.transition = animate ? 'transform 300ms cubic-bezier(.4,0,.2,1)' : 'none';
-    track.style.transform = 'translateY(' + (-STEP * idx) + 'px)';
+  var HOLD = 2200, labels = ['Photo Edit', 'Video Edit'];
+  var frame = document.getElementById('frame'), btn = document.getElementById('ab-toggle');
+  function carousel(trackId, step) {
+    var track = document.getElementById(trackId), box = track.parentNode, i = 0, timer = null, on = false;
+    function set(idx, animate) {
+      track.style.transition = animate ? 'transform 300ms cubic-bezier(.4,0,.2,1)' : 'none';
+      track.style.transform = 'translateY(' + (-step * idx) + 'px)';
+    }
+    function next() { i += 1; set(i, true); }
+    track.addEventListener('transitionend', function (e) {
+      if (e.target !== track || !on) return;
+      if (i >= labels.length) { i = 0; set(0, false); void track.offsetHeight; }
+      box.setAttribute('aria-label', labels[i]);
+      timer = setTimeout(next, HOLD);
+    });
+    return {
+      start: function () { this.stop(); on = true; timer = setTimeout(next, HOLD); },
+      stop: function () { on = false; clearTimeout(timer); i = 0; set(0, false); box.setAttribute('aria-label', labels[0]); }
+    };
   }
-  function next() { i += 1; set(i, true); }
-  track.addEventListener('transitionend', function () {
-    if (i >= labels.length) { i = 0; set(0, false); void track.offsetHeight; }
-    rot.setAttribute('aria-label', labels[i]);
-    setTimeout(next, HOLD);
-  });
-  set(0, false);
-  setTimeout(next, HOLD);
+  var A = carousel('rotA-track', 35), B = carousel('rotB-track', 35), v = 'a';
+  function show(ver) {
+    v = ver;
+    frame.classList.toggle('frame-b', v === 'b');
+    btn.setAttribute('aria-label', v === 'b' ? '版本 B，點擊切換到版本 A' : '版本 A，點擊切換到版本 B');
+    (v === 'b' ? A : B).stop();
+    (v === 'b' ? B : A).start();
+  }
+  btn.addEventListener('click', function () { show(v === 'b' ? 'a' : 'b'); });
+  show(/[?&]v=b(&|$)/i.test(location.search) ? 'b' : 'a');
 })();
 
 (function () {
@@ -150,7 +194,10 @@ html, body { width:100%; height:100%; background:#000; overflow:hidden; touch-ac
 
     frame.style.transform = 'scale(' + scale + ')';
     root.style.setProperty('--mob-scale', scale);
-    root.style.setProperty('--safe-top', (topPad / scale) + 'px');
+    // 'env' result is bound live in CSS: inside the wrapper (PF App Prototype 1.0.0 b7) the inset arrives AFTER first
+    // paint and fires no resize — a number read once stays 0 until reload (14 Pro Max + others, 2026-10-16).
+    var liveEnv = !inj && !fb && mode === 'env';
+    root.style.setProperty('--safe-top', liveEnv ? 'calc(env(safe-area-inset-top, 0px) / ' + scale + ')' : (topPad / scale) + 'px');
     root.style.setProperty('--safe-bot', (BOTTOM_BAR_INCLUDES_HOME_INDICATOR ? 0 : insetBot / scale) + 'px');
     if (FRAME_HEIGHT === 'inner') frame.style.setProperty('height', (window.innerHeight / scale) + 'px', 'important');
     else frame.style.removeProperty('height');
@@ -168,6 +215,12 @@ html, body { width:100%; height:100%; background:#000; overflow:hidden; touch-ac
   apply();
   window.addEventListener('resize', apply);
   window.addEventListener('orientationchange', apply);
+  // late-inset re-reads: keep the numeric paths (fallback / ?safe readout) current once the inset arrives
+  window.addEventListener('load', apply);
+  window.addEventListener('pageshow', apply);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) apply(); });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', apply);
+  [100, 300, 600, 1000, 2000].forEach(function (t) { setTimeout(apply, t); });
 })();
 </script>
 
