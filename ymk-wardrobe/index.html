@@ -26,7 +26,10 @@ body{margin:0;background:var(--stage);color:var(--fg);font-family:var(--font);ov
 .phone{position:relative;width:320px;height:694px;border-radius:40px;overflow:hidden;background:#fff;flex:0 0 auto;
   box-shadow:0 0 0 1px rgba(255,255,255,.12),0 0 0 9px #1f1f25,0 0 0 10px rgba(255,255,255,.06),0 30px 70px rgba(0,0,0,.6);transform-origin:center}
 .screen{position:absolute;inset:0;display:none}
-.screen.on{display:block;animation:fadein .22s ease-out both}
+.screen.on{display:block}
+/* default screen change: the old screen sits on top and fades out, so pixels that stay the same never change alpha */
+.screen.leaving{display:block;z-index:3;pointer-events:none;animation:fadeout .24s ease-out forwards}
+@keyframes fadeout{from{opacity:1}to{opacity:0}}
 .screen>img.shot{width:320px;height:694px;display:block;user-select:none;-webkit-user-drag:none}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
 .hs{position:absolute;border:0;padding:0;background:transparent;cursor:pointer;border-radius:8px}
@@ -333,9 +336,12 @@ function placeDot(){ var s=S[current]; var pt=typeof s.dot==='function'?s.dot():
   if (pt){ s.dotEl.style.left=pt[0]+'px'; s.dotEl.style.top=pt[1]+'px'; s.dotEl.hidden=false; } else s.dotEl.hidden=true; }
 function go(id,opt){
   stopAll();
-  if (current) document.getElementById('sc-'+current).classList.remove('on');
+  var special=opt&&(opt.add||opt.fromInput||opt.expand||opt.collapse||opt.kb||opt.type);
+  Array.prototype.forEach.call(phone.querySelectorAll('.screen.leaving'),function(n){ n.classList.remove('leaving'); });
+  if (current && current!==id){ var pe=document.getElementById('sc-'+current); pe.classList.remove('on');
+    if (!special){ void pe.offsetWidth; pe.classList.add('leaving'); setTimeout(function(){ pe.classList.remove('leaving'); },280); } }
   current=id; var s=S[id], el=document.getElementById('sc-'+id);
-  el.style.animation=(opt&&(opt.add||opt.fromInput||opt.expand||opt.collapse||opt.kb||opt.type))?'none':''; void el.offsetWidth; el.classList.add('on');
+  el.classList.add('on');
   phone.classList.remove('flash');
   var pre=(opt&&opt.fromInput)?660:0;
   if (s.gen){ if (pre) genFx(); later(function(){ grow(s.fill,GEN_MS); },pre); later(function(){ flow.added=false; go('w5'); },GEN_MS+pre); }
