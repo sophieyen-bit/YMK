@@ -56,7 +56,9 @@ body{margin:0;background:var(--stage);color:var(--fg);font-family:var(--font);ov
 .sprite{position:absolute;pointer-events:none;background-size:100% 100%}
 .slist{position:absolute;overflow-y:auto;overflow-x:hidden;background:#fff;z-index:3;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;cursor:grab}
 .slist::-webkit-scrollbar{display:none}
-.slist img{display:block;width:320px;max-width:none;user-select:none;-webkit-user-drag:none;pointer-events:none}
+.sct{position:relative;width:320px}
+.sct .stop{position:absolute;left:0;top:0;width:320px;display:block;background-size:320px 694px;background-repeat:no-repeat}
+.slist img{position:absolute;left:0;display:block;width:320px;max-width:none;user-select:none;-webkit-user-drag:none;pointer-events:none}
 .sbar{position:absolute;left:313px;width:3px;border-radius:2px;background:rgba(0,0,0,.38);z-index:4;pointer-events:none;opacity:0;transition:opacity .35s}
 .sbar.on{opacity:1;transition:opacity .08s}
 .ov{position:absolute;left:0;width:320px;overflow:hidden;background:#fff;z-index:50;pointer-events:none}
@@ -161,8 +163,11 @@ var S = {
    hs:[[X_SHEET,'@busy']]},
  'w5': {code:'06', group:'Create with AI', name:'生成完成', note:'生成約 1 秒。按 Generate 即扣 20 credits（120 → 100）。單品預覽（左上 AI 標籤、右上 Save）；可 Regenerate（再扣 20），或 Add to My Wardrobe（不另扣）。點燈泡可叫出 Inspiration。', hint:'點 Add to My Wardrobe（或先點燈泡看 Inspiration）。', dot:ctr(ADD),
    hs:[[INPUT,'@noop'],[[278,590,28,28],'@expand'],[ADD,'@add'],[REGEN,'@gen'],[[278,307,26,26],'@save'],[X_SHEET,'@close']]},
- 'w6b':{code:'06b', group:'Create with AI', name:'結果 + Inspiration', note:'點燈泡：Regenerate 以上的內容上移，下方出現 Inspiration list；list 可上下滑動，出現時右側 scroll indicator 閃一下提示可滑動。點輸入框或燈泡收回。', hint:'上下滑動 Inspiration，或點 Add to My Wardrobe。', dot:ctr(ADD6), list:{area:LIST6,img:'list',h:386,rows:26,onRow:function(){ return '@pick'; }},
-   hs:[[INPUT6,'@collapse'],[BULB6,'@collapse'],[ADD6,'@add'],[REGEN6,'@gen'],[X_SHEET,'@close']]},
+ 'w6b':{code:'06b', group:'Create with AI', name:'結果 + Inspiration', note:'點燈泡：Regenerate 以上的內容上移，下方出現 Inspiration list；list 可上下滑動，出現時右側 scroll indicator 閃一下提示可滑動。點輸入框或燈泡收回。', hint:'上下滑動 Inspiration，或點 Add to My Wardrobe。', dot:function(){ var y=297+350-(S.w6b.slEl?S.w6b.slEl.scrollTop:UP); return (y<305||y>686)?null:[235,y]; },
+   list:{area:[0,297,320,397],img:'list',h:386,off:397,rows:26,start:UP,onRow:function(){ return '@pick'; },
+     top:{key:'w5',r:[0,297,320,397]},
+     btns:[[[107,254,199,70],'@collapse'],[[278,293,28,28],'@collapse'],[[15,334,140,33],'@gen'],[[165,334,140,33],'@add'],[[278,10,26,26],'@save'],[[15,254,70,70],'@ref']]},
+   hs:[[X_SHEET,'@close']]},
  'w7': {code:'07', group:'My Wardrobe', name:'加入衣櫃（面板收起）', note:'Add to My Wardrobe 後面板淡出，單品飛入 Create with AI 右邊第一格，toast「Added to My Wardrobe」，不自動套用。新單品左上 NEW、右上 AI 標籤；點選後 NEW 消失。', hint:'點新單品試穿。', dot:ctr(NEW_ITEM),
    hs:[[NEW_ITEM,'@apply'],[TILE_AI,'w1'],[X_ROOM,'@noop']]},
  'w8': {code:'08', group:'My Wardrobe', name:'套用中', note:'Processing toast；照片上跑生成線條，單品縮圖顯示進度。', hint:'套用中，完成後自動顯示結果。', apply:true,
@@ -189,7 +194,12 @@ Object.keys(S).forEach(function(id){
   }
   if (s.list){
     var sl=document.createElement('div'); sl.className='slist'; place(sl,s.list.area);
-    var li=document.createElement('img'); li.src=ICONS[s.list.img]; li.alt='Inspiration'; li.draggable=false; li.style.height=s.list.h+'px'; sl.appendChild(li); el.appendChild(sl); s.slEl=sl;
+    var L=s.list, off=L.off||0, ct=document.createElement('div'); ct.className='sct'; ct.style.height=(off+L.h)+'px'; sl.appendChild(ct);
+    if (L.top){ var tp=document.createElement('i'); tp.className='stop'; tp.style.backgroundImage='url('+IMG[L.top.key]+')'; tp.style.backgroundPosition=(-L.top.r[0])+'px '+(-L.top.r[1])+'px'; tp.style.height=L.top.r[3]+'px'; ct.appendChild(tp); }
+    var li=document.createElement('img'); li.src=ICONS[L.img]; li.alt='Inspiration'; li.draggable=false; li.style.height=L.h+'px'; li.style.top=off+'px'; ct.appendChild(li);
+    (L.btns||[]).forEach(function(h){ var b=document.createElement('button'); b.className='hs'; place(b,h[0]); b.setAttribute('aria-label',h[1]);
+      b.addEventListener('click',function(e){ e.stopPropagation(); if (sl._moved){ sl._moved=false; return; } act(h[1]); }); ct.appendChild(b); });
+    el.appendChild(sl); s.slEl=sl;
     var sb=document.createElement('i'); sb.className='sbar'; el.appendChild(sb); s.sbEl=sb; wireList(s);
   }
   if (CREDIT[id]){ var cr=document.createElement('img'); cr.className='credit'; cr.alt=''; el.appendChild(cr); s.crEl=cr; }
@@ -297,14 +307,17 @@ function flashBar(s){ if(!s||!s.sbEl) return; syncBar(s); s.sbEl.classList.add('
 function syncBar(s){ var sl=s.slEl, h=sl.clientHeight, H=sl.scrollHeight, bh=Math.max(24,h*h/H), max=H-h; s.sbEl.style.height=bh+'px';
   s.sbEl.style.top=(s.list.area[1]+3+(max>0?sl.scrollTop/max:0)*(h-bh-6))+'px'; }
 function wireList(s){
-  var sl=s.slEl, L=s.list, down=false, sy=0, st=0, moved=false, k=1;
-  sl.addEventListener('pointerdown',function(e){ moved=false; if(e.pointerType==='touch') return; down=true; sy=e.clientY; st=sl.scrollTop; k=phone.getBoundingClientRect().width/320; sl.setPointerCapture(e.pointerId); });
-  sl.addEventListener('pointermove',function(e){ if(!down) return; var dy=(e.clientY-sy)/k; if(Math.abs(dy)>3) moved=true; if(moved) sl.scrollTop=st-dy; });
-  function up(){ down=false; } sl.addEventListener('pointerup',up); sl.addEventListener('pointercancel',up);
+  var sl=s.slEl, L=s.list, off=L.off||0, down=false, sy=0, st=0, k=1, pid=null;
+  sl.addEventListener('pointerdown',function(e){ sl._moved=false; if(e.pointerType==='touch') return; down=true; sy=e.clientY; st=sl.scrollTop; pid=e.pointerId; k=phone.getBoundingClientRect().width/320; });
+  sl.addEventListener('pointermove',function(e){ if(!down) return; var dy=(e.clientY-sy)/k;
+    if(!sl._moved && Math.abs(dy)>3){ sl._moved=true; try{ sl.setPointerCapture(pid); }catch(_){} sl.classList.add('drag'); }
+    if(sl._moved) sl.scrollTop=st-dy; });
+  function up(){ down=false; sl.classList.remove('drag'); } sl.addEventListener('pointerup',up); sl.addEventListener('pointercancel',up);
   sl.addEventListener('wheel',function(e){ sl.scrollTop+=e.deltaY; e.preventDefault(); },{passive:false});
   sl.addEventListener('scroll',function(){ flashBar(s); if (current && S[current]===s) placeDot(); });
-  sl.addEventListener('click',function(e){ e.stopPropagation(); if(moved){ moved=false; return; }
-    var r=phone.getBoundingClientRect(), kk=r.width/320, y=(e.clientY-r.top)/kk-L.area[1]+sl.scrollTop, x=(e.clientX-r.left)/kk;
+  sl.addEventListener('click',function(e){ e.stopPropagation(); if(sl._moved){ sl._moved=false; return; }
+    var r=phone.getBoundingClientRect(), kk=r.width/320, y=(e.clientY-r.top)/kk-L.area[1]+sl.scrollTop-off, x=(e.clientX-r.left)/kk;
+    if (y<0) return;
     if (y<L.rows-4){ if (x>230) act('@shuffle'); return; }
     var i=Math.floor((y-L.rows)/36); if (i>=0 && i<10) act(L.onRow(i)); });
 }
@@ -345,7 +358,7 @@ function go(id,opt){
   phone.classList.remove('flash');
   var pre=(opt&&opt.fromInput)?660:0;
   if (s.gen){ if (pre) genFx(); later(function(){ grow(s.fill,GEN_MS); },pre); later(function(){ flow.added=false; go('w5'); },GEN_MS+pre); }
-  if (s.list){ s.slEl.scrollTop=0; if (opt&&opt.expand) listFx(true); else if (opt&&opt.kb) kbFx(); else later(function(){ flashBar(s); },300); }
+  if (s.list){ s.slEl.scrollTop=s.list.start||0; if (opt&&opt.expand) listFx(true); else if (opt&&opt.kb) kbFx(); else later(function(){ flashBar(s); },300); }
   if (opt&&opt.collapse) listFx(false);
   if (opt&&opt.type) typeFx(opt.type==='w2'?'w2':'w2b');
   if (s.apply){
